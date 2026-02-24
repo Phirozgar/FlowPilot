@@ -5,21 +5,13 @@ User = get_user_model()
 
 
 class Task(models.Model):
-    """Task model for task management."""
+    """Task model for 2-step approval workflow."""
     
     STATUS_CHOICES = [
-        ('todo', 'To Do'),
-        ('in_progress', 'In Progress'),
-        ('pending_approval', 'Pending Approval'),
+        ('pending', 'Pending'),
+        ('in_review', 'In Review'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
-        ('done', 'Done'),
-    ]
-    
-    PRIORITY_CHOICES = [
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
     ]
     
     title = models.CharField(max_length=255)
@@ -44,13 +36,12 @@ class Task(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='todo'
+        default='pending'
     )
     
-    priority = models.CharField(
-        max_length=20,
-        choices=PRIORITY_CHOICES,
-        default='medium'
+    approval_step = models.IntegerField(
+        default=1,
+        help_text='Step 1: Manager review, Step 2: Admin review'
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,12 +57,4 @@ class Task(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.title} ({self.get_status_display()})"
-    
-    def can_be_approved(self):
-        """Check if task can be approved."""
-        return self.status == 'pending_approval'
-    
-    def can_be_assigned(self):
-        """Check if task can be assigned."""
-        return self.status in ['todo', 'in_progress']
+        return f"{self.title} (Step {self.approval_step}, {self.get_status_display()})"

@@ -2,6 +2,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import CustomUser
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
@@ -18,8 +19,8 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_permissions(self):
-        """Allow registration without authentication."""
-        if self.action in ['create', 'register']:
+        """Allow registration and login without authentication."""
+        if self.action in ['create', 'register', 'login']:
             return [AllowAny()]
         return [IsAuthenticated()]
     
@@ -55,7 +56,7 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
-        """Login user and return tokens (handled by JWT endpoint, but keeping for reference)."""
+        """Login user and return JWT tokens."""
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = authenticate(
@@ -63,9 +64,14 @@ class UserViewSet(viewsets.ModelViewSet):
                 password=serializer.validated_data['password']
             )
             if user:
+                refresh = RefreshToken.for_user(user)
                 return Response({
                     'message': 'Login successful',
-                    'user': UserSerializer(user).data
+                    'user': UserSerializer(user).data,
+                    'tokens': {
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                    }
                 }, status=status.HTTP_200_OK)
             return Response(
                 {'error': 'Invalid credentials'},

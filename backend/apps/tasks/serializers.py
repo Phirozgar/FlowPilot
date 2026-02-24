@@ -5,7 +5,7 @@ from apps.users.serializers import UserSerializer
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    """Serializer for task data."""
+    """Serializer for task data with approval workflow."""
     
     created_by = UserSerializer(read_only=True)
     assigned_to = UserSerializer(read_only=True)
@@ -27,17 +27,11 @@ class TaskSerializer(serializers.ModelSerializer):
             'assigned_to',
             'assigned_to_id',
             'status',
-            'priority',
+            'approval_step',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Dynamically set the queryset for assigned_to_id
-        from apps.users.models import CustomUser
-        self.fields['assigned_to_id'].queryset = CustomUser.objects.all()
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'approval_step']
     
     def create(self, validated_data):
         """Create task with current user as creator."""
@@ -59,6 +53,6 @@ class TaskListSerializer(serializers.ModelSerializer):
             'created_by_username',
             'assigned_to_username',
             'status',
-            'priority',
+            'approval_step',
             'created_at',
         ]

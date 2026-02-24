@@ -5,17 +5,13 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from .models import Task
 from .serializers import TaskSerializer, TaskListSerializer
-from utils.permissions import (
-    IsTaskCreatorOrAssigned,
-    CanAssignTask,
-    IsAdminOrManager,
-)
 
 
 class TaskViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for task management.
-    Provides list, create, retrieve, update, delete operations with role-based permissions.
+    ViewSet for task management with 2-step approval workflow.
+    - Step 1: MANAGER reviews and approves/rejects
+    - Step 2: ADMIN reviews and approves/rejects
     """
     
     serializer_class = TaskSerializer
@@ -32,7 +28,6 @@ class TaskViewSet(viewsets.ModelViewSet):
         if user.is_manager():
             return Task.objects.all()
         
-        # Regular users: see their own created or assigned tasks
         return Task.objects.filter(
             Q(created_by=user) | Q(assigned_to=user)
         )
@@ -44,128 +39,124 @@ class TaskViewSet(viewsets.ModelViewSet):
         return TaskSerializer
     
     def perform_create(self, serializer):
-        """Create task with current user as creator."""
-        serializer.save(created_by=self.request.user)
-    
-    def destroy(self, request, *args, **kwargs):
-        """Delete task (only creator or admin can delete)."""
-        task = self.get_object()
-        if task.created_by != request.user and not request.user.is_admin():
+        """Create task with current user as creator. Only users can create."""
+        if not self.request.user.is_regular_user():
             return Response(
-                {'detail': 'You can only delete your own tasks.'},
+                {'detail': 'Only regular users can create tasks.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        return super().destroy(request, *args, **kwargs)
+        serializer.save(created_by=self.request.user, status='in_review')
     
-    def update(self, request, *args, **kwargs):
-        """
-        Update task with permission checks.
-        Only creator or managers can update.
-        """
-        task = self.get_object()
-        if task.created_by != request.user and not request.user.is_manager():
+    def create(self, request, *args, **kwargs):
+        """Override create to check permissions."""
+        if not request.user.is_regular_user():
             return Response(
-                {'detail': 'You can only update your own tasks.'},
+                {'detail': 'Only regular users can create tasks.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        return super().update(request, *args, **kwargs)
-    
-    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, CanAssignTask])
-    def assign(self, request, pk=None):
-        """Assign task to a user (managers and admins only)."""
-        task = self.get_object()
-        assigned_to_id = request.data.get('assigned_to_id')
-        
-        if not assigned_to_id:
-            return Response(
-                {'error': 'assigned_to_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            from apps.users.models import CustomUser
-            user = CustomUser.objects.get(id=assigned_to_id)
-        except CustomUser.DoesNotExist:
-            return Response(
-                {'error': 'User not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        if not task.can_be_assigned():
-            return Response(
-                {'error': f'Task cannot be assigned when in {task.get_status_display()} status'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        task.assigned_to = user
-        task.save()
-        
-        serializer = TaskSerializer(task, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
     
     @action(detail=True, methods=['patch'])
-    def change_status(self, request, pk=None):
+    def approve(self, request, pk=None):
         """
-        Change task status.
-        Users can only change status of tasks they're assigned to or created.
+        Approve task based on current approval step.
+        Step 1 (MANAGER): Move to step 2
+        Step 2 (ADMIN): Set status to Approved
         """
         task = self.get_object()
-        new_status = request.data.get('status')
+        user = request.user
         
-        if not new_status:
+        # Step 1: MANAGER approval
+        if task.approval_step == 1:
+            if not user.is_manager() or user.is_regular_user():
+                return Response(
+                    {'detail': 'Only managers can approve at step 1.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            task.approval_step = 2
+            task.save()
             return Response(
-                {'error': 'status is required'},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    'detail': 'Task approved by manager. Moved to step 2 (Admin review).',
+                    'task': TaskSerializer(task, context={'request': request}).data
+                },
+                status=status.HTTP_200_OK
             )
         
-        # Check if status is valid
-        valid_statuses = [choice[0] for choice in Task.STATUS_CHOICES]
-        if new_status not in valid_statuses:
+        # Step 2: ADMIN approval
+        elif task.approval_step == 2:
+            if not user.is_admin():
+                return Response(
+                    {'detail': 'Only admins can approve at step 2.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            task.status = 'approved'
+            task.save()
             return Response(
-                {'error': f'Invalid status. Choose from: {", ".join(valid_statuses)}'},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    'detail': 'Task approved by admin. Status set to Approved.',
+                    'task': TaskSerializer(task, context={'request': request}).data
+                },
+                status=status.HTTP_200_OK
             )
         
-        # Permission check: only creator, assigned user, or manager can change status
-        if (task.created_by != request.user and 
-            task.assigned_to != request.user and 
-            not request.user.is_manager()):
+        return Response(
+            {'detail': 'Task cannot be approved at this step.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    @action(detail=True, methods=['patch'])
+    def reject(self, request, pk=None):
+        """
+        Reject task at any step.
+        Both MANAGER and ADMIN can reject.
+        """
+        task = self.get_object()
+        user = request.user
+        
+        # Step 1: MANAGER can reject
+        if task.approval_step == 1:
+            if not user.is_manager() or user.is_regular_user():
+                return Response(
+                    {'detail': 'Only managers can reject at step 1.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            task.status = 'rejected'
+            task.save()
             return Response(
-                {'detail': 'You do not have permission to change this task status.'},
-                status=status.HTTP_403_FORBIDDEN
+                {
+                    'detail': 'Task rejected by manager.',
+                    'task': TaskSerializer(task, context={'request': request}).data
+                },
+                status=status.HTTP_200_OK
             )
         
-        task.status = new_status
-        task.save()
+        # Step 2: ADMIN can reject
+        elif task.approval_step == 2:
+            if not user.is_admin():
+                return Response(
+                    {'detail': 'Only admins can reject at step 2.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            task.status = 'rejected'
+            task.save()
+            return Response(
+                {
+                    'detail': 'Task rejected by admin.',
+                    'task': TaskSerializer(task, context={'request': request}).data
+                },
+                status=status.HTTP_200_OK
+            )
         
-        serializer = TaskSerializer(task, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            {'detail': 'Task cannot be rejected at this step.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     
     @action(detail=False, methods=['get'])
-    def by_status(self, request):
-        """Filter tasks by status."""
-        status_filter = request.query_params.get('status')
-        if not status_filter:
-            return Response(
-                {'error': 'status parameter is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        tasks = self.get_queryset().filter(status=status_filter)
-        serializer = TaskListSerializer(tasks, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def by_priority(self, request):
-        """Filter tasks by priority."""
-        priority = request.query_params.get('priority')
-        if not priority:
-            return Response(
-                {'error': 'priority parameter is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        tasks = self.get_queryset().filter(priority=priority)
+    def pending_approval(self, request):
+        """Get all tasks pending approval."""
+        tasks = self.get_queryset().filter(status='in_review')
         serializer = TaskListSerializer(tasks, many=True)
         return Response(serializer.data)
     
