@@ -3,7 +3,14 @@ from django.contrib.auth.models import AbstractUser
 
 
 class CustomUser(AbstractUser):
-    """Extended User model with role field."""
+    """
+    Extended User model with role-based access control.
+    
+    Roles:
+    - admin: Full access to all operations
+    - manager: Can review and approve tasks at step 1
+    - user: Can create tasks, view own tasks
+    """
     
     ROLE_CHOICES = [
         ('admin', 'Admin'),
@@ -24,13 +31,17 @@ class CustomUser(AbstractUser):
         verbose_name_plural = 'Users'
     
     def __str__(self):
+        """String representation of user with role."""
         return f"{self.username} ({self.get_role_display()})"
     
     def is_admin(self):
-        return self.role == 'admin'
+        """Check if user is an admin."""
+        return self.role.lower() == 'admin'
     
     def is_manager(self):
-        return self.role in ['admin', 'manager']
+        """Check if user is a manager or admin."""
+        return self.role.lower() in ['admin', 'manager']
     
     def is_regular_user(self):
-        return self.role == 'user'
+        """Check if user is a regular user."""
+        return self.role.lower() == 'user'

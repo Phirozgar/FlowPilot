@@ -1,3 +1,9 @@
+"""
+User management views for authentication and user administration.
+
+Handles user registration, login, and role-based user management.
+"""
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,8 +16,15 @@ from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for user management.
-    Provides list, create, retrieve, update, delete operations.
+    ViewSet for user management and authentication.
+    
+    Endpoints:
+    - List users: /api/users/ (managers/admins only)
+    - Register: /api/users/register/
+    - Login: /api/users/login/
+    - Current user info: /api/users/me/
+    - Filter by role: /api/users/by_role/
+    - Delete user: /api/users/{id}/ (admins only)
     """
     
     queryset = CustomUser.objects.all()
@@ -25,7 +38,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def list(self, request, *args, **kwargs):
-        """List all users (only admins and managers can view)."""
+        """List all users. Only managers and admins allowed."""
         if not request.user.is_manager():
             return Response(
                 {'detail': 'You do not have permission to view all users.'},
@@ -34,7 +47,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
     
     def destroy(self, request, *args, **kwargs):
-        """Delete user (only admins can delete)."""
+        """Delete user. Only admins allowed."""
         if not request.user.is_admin():
             return Response(
                 {'detail': 'You do not have permission to delete users.'},
@@ -87,7 +100,13 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def by_role(self, request):
-        """Filter users by role."""
+        """Get users by role. Managers and admins only."""
+        if not request.user.is_manager():
+            return Response(
+                {'detail': 'You do not have permission to view users.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         role = request.query_params.get('role')
         if not role:
             return Response(
