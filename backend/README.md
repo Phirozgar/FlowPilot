@@ -25,6 +25,9 @@ python manage.py migrate
 ```bash
 python manage.py createsuperuser
 ```
+Username: admin
+Email address: admin@gmail.com
+Password: password@123
 
 ### 5. Run Development Server
 ```bash
@@ -52,18 +55,23 @@ Server will be available at `http://localhost:8000`
 
 ### Tasks
 - `GET /api/tasks/` - List tasks (filtered by role)
-- `POST /api/tasks/` - Create task
+- `POST /api/tasks/` - Create task (only regular users)
 - `GET /api/tasks/{id}/` - Get task details
 - `PUT /api/tasks/{id}/` - Update task
 - `PATCH /api/tasks/{id}/` - Partial update
 - `DELETE /api/tasks/{id}/` - Delete task
-- `PATCH /api/tasks/{id}/assign/` - Assign task to user (Manager/Admin)
-- `PATCH /api/tasks/{id}/change_status/` - Change task status
-- `GET /api/tasks/by_status/?status=todo` - Filter by status
-- `GET /api/tasks/by_priority/?priority=high` - Filter by priority
+- `PATCH /api/tasks/{id}/approve/` - Approve workflow step (role-based)
+- `PATCH /api/tasks/{id}/reject/` - Reject workflow step
+- `PATCH /api/tasks/{id}/assign/` - Assign task to a user (Manager/Admin)
+- `PATCH /api/tasks/{id}/change_status/` - Change task status (authorized users)
 - `GET /api/tasks/my_tasks/` - Tasks assigned to me
 - `GET /api/tasks/created_by_me/` - Tasks I created
+- `GET /api/tasks/pending_approval/` - Tasks waiting for manager review
+- `GET /api/tasks/by_status/?status=pending` - Filter by status
 
+Note: the priority field was removed in week 2; filtering by priority is no longer supported.
+
+Statuses available: `pending`, `in_review`, `approved`, `rejected` (see model choices).
 ---
 
 ## Admin Panel

@@ -71,13 +71,22 @@ PATCH  /api/tasks/{id}/reject/
        └─ Reject task (MANAGER step 1, ADMIN step 2)
        
 GET    /api/tasks/pending_approval/
-       └─ Get in_review tasks
+       └─ Get tasks with status `pending` (waiting for step‑1 review)
        
 GET    /api/tasks/my_tasks/
        └─ Get assigned to me
        
 GET    /api/tasks/created_by_me/
        └─ Get created by me
+       
+PATCH  /api/tasks/{id}/assign/
+       └─ Assign task to user (manager/admin)
+       
+PATCH  /api/tasks/{id}/change_status/
+       └─ Change status (creator/assignee/manager/admin)
+       
+GET    /api/tasks/by_status/?status=value
+       └─ Filter tasks by status
 ```
 
 ## HTTP Status Codes
