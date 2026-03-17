@@ -48,7 +48,7 @@ updated_at (DateTimeField) - Auto-updated on modification
   "id": 1,
   "title": "Review Q2 Budget",
   "description": "Need to review and approve Q2 budget allocation",
-  "status": "in_review",
+  "status": "pending",
   "approval_step": 1,
   "created_by": {
     "id": 5,
@@ -118,7 +118,7 @@ updated_at (DateTimeField) - Auto-updated on modification
 
 **Permission**: MANAGER or ADMIN role
 
-**Action**: Moves approval_step from 1 to 2
+**Action**: Moves approval_step from 1 to 2 and changes status to `in_review`
 
 **Request Body**: Empty `{}`
 
@@ -135,7 +135,6 @@ updated_at (DateTimeField) - Auto-updated on modification
   }
 }
 ```
-
 ### 5. Admin Approves Task - Step 2 (PATCH)
 
 **Endpoint**: `PATCH /api/tasks/{id}/approve/`
@@ -189,6 +188,8 @@ updated_at (DateTimeField) - Auto-updated on modification
 **Endpoint**: `GET /api/tasks/pending_approval/`
 
 **Permission**: Authenticated users
+
+**Description**: Returns tasks with status `pending`, i.e. waiting for step‑1 review.
 
 **Response** (200 OK):
 ```json

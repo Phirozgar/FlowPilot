@@ -34,7 +34,9 @@ Week 2 focuses on implementing the **Task Module** with a **2-step approval work
   - `create()` - Create task (USER only)
   - `approve()` - 2-step approval logic
   - `reject()` - Rejection at any step
-  - `pending_approval()` - Filter in-review tasks
+  - `pending_approval()` - Filter tasks waiting for manager review (status `pending`)
+  - `assign()` - Assign task to user (manager/admin)
+  - `change_status()` - Manual status update by authorized users
   - `my_tasks()` - Tasks assigned to user
   - `created_by_me()` - Tasks created by user
 
@@ -56,7 +58,7 @@ Week 2 focuses on implementing the **Task Module** with a **2-step approval work
 
 ```
 Step 1 - MANAGER Review
-├─ Approve: approval_step 1 → 2
+├─ Approve: approval_step 1 → 2, status -> in_review
 └─ Reject: status → rejected
 
 Step 2 - ADMIN Review
@@ -83,14 +85,17 @@ Step 2 - ADMIN Review
 | DELETE | /api/tasks/{id}/ | Creator/Admin |
 | PATCH | /api/tasks/{id}/approve/ | MANAGER/ADMIN |
 | PATCH | /api/tasks/{id}/reject/ | MANAGER/ADMIN |
+| PATCH | /api/tasks/{id}/assign/ | MANAGER/ADMIN |
+| PATCH | /api/tasks/{id}/change_status/ | Creator/Manager/Admin or assignee |
 | GET | /api/tasks/pending_approval/ | All |
 | GET | /api/tasks/my_tasks/ | All |
 | GET | /api/tasks/created_by_me/ | All |
+| GET | /api/tasks/by_status/?status=value | All |
 
 ## 🧪 Testing Status
 
-- **Total Tests**: 63
-- **Passed**: 63 ✅
+- **Total Tests Added This Week**: 10
+- **Passed**: 10 ✅
 - **Failed**: 0
 - **Success Rate**: 100%
 

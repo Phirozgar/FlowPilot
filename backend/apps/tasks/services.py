@@ -64,7 +64,8 @@ class TaskApprovalService:
                 }
             
             task.approval_step = 2
-            task.save(update_fields=['approval_step', 'updated_at'])
+            task.status = 'in_review'
+            task.save(update_fields=['approval_step', 'status', 'updated_at'])
             return {
                 'status': 'success',
                 'message': 'Task approved by manager. Moved to step 2 (Admin review).',
