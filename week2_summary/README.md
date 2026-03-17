@@ -64,6 +64,36 @@ This folder contains complete documentation for Week 2 - Task Module implementat
    - Phase 8: Data validation tests
    - Test results documentation template
 
+
+6. **06_POSTMAN_TESTING_GUIDE.md** (12.0 KB)
+    - Complete Postman test cases for manual testing
+    - Setup instructions (Base URL, JWT tokens)
+    - 10 test cases with example requests and responses
+    - Create task, List, Update, Delete, Approve (Manager & Admin), Reject
+    - Permission tests (what should not be allowed)
+    - Complete workflow test (all 2 steps)
+    - Environment setup with Postman variables
+    - Troubleshooting guide
+
+7. **07_DASHBOARD_ENDPOINT.md** (13.3 KB)
+
+8. **09_FILTERING_AND_PAGINATION.md** (15.9 KB)
+    - Filtering by status, assigned_to, created_by, approval_step
+    - Pagination with page numbers
+    - Ordering by created_at, updated_at, status
+    - Search by title and description
+    - Frontend integration (React, Vue, Python)
+    - Combined filter examples
+    - cURL testing guide
+    - Simple dashboard statistics API endpoint
+    - Task counts by status (pending, approved, rejected)
+    - Personal task metrics (created, assigned)
+    - Implementation details (View, Serializer)
+    - Frontend integration examples (React, Vue)
+    - cURL, Postman, and Python usage examples
+    - Database query optimization tips
+    - Error handling and responses
+    - Role-based behavior differences
 ## 🎯 How to Use This Documentation
 
 ### For Quick Overview
@@ -80,6 +110,27 @@ This folder contains complete documentation for Week 2 - Task Module implementat
 
 ### For Verification Before Deployment
 → Use **03_VERIFICATION_CHECKLIST.md** as a checklist
+
+### For Dashboard Statistics
+
+### For Advanced Filtering & Pagination
+
+### For Code Quality & Refactoring
+→ Use **11_REFACTORING_GUIDE.md** for architecture improvements and code quality
+→ Use **09_FILTERING_AND_PAGINATION.md** for filter options, pagination, and search
+→ Use **07_DASHBOARD_ENDPOINT.md** for the dashboard API endpoint
+
+8. **09_FILTERING_AND_PAGINATION.md** (15.9 KB)
+    - Filtering by status, assigned_to, created_by, approval_step
+    - Pagination with page numbers
+    - Ordering by created_at, updated_at, status
+    - Search by title and description
+    - Frontend integration (React, Vue, Python)
+    - Combined filter examples
+    - cURL testing guide
+
+### For Postman Manual Testing
+→ Use **06_POSTMAN_TESTING_GUIDE.md** with complete test cases and examples
 
 ## 📊 Week 2 Summary
 
@@ -141,8 +192,8 @@ ADMIN:    Review Step 2 (approve/reject)
 
 ## 📚 Total Documentation
 
-- **5 markdown files**
-- **40 KB of documentation**
+- **6 markdown files**
+- **52 KB of documentation**
 - **100+ checkpoints and tests**
 - **100+ cURL examples and code samples**
 
@@ -169,6 +220,7 @@ This implementation demonstrates:
 ## 📞 Support
 
 For detailed testing instructions → See **05_TESTING_GUIDE.md**
+For Postman testing → See **06_POSTMAN_TESTING_GUIDE.md**
 For API reference → See **02_API_DOCUMENTATION.md**
 For quick commands → See **04_QUICK_REFERENCE.md**
 For implementation details → See **01_IMPLEMENTATION_OVERVIEW.md**
