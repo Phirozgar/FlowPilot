@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/api';
 
 const Login = () => {
@@ -12,8 +12,11 @@ const Login = () => {
     e.preventDefault();
     setError('');
     try {
-      const response = await api.post('/api/auth/token/', { username, password });
-      localStorage.setItem('opsflow_token', response.data.access);
+      const response = await api.post('/api/users/login/', { username, password });
+      const token = response.data.tokens?.access || response.data.access;
+      if (!token) throw new Error('No token returned');
+
+      localStorage.setItem('opsflow_token', token);
       navigate('/');
     } catch (err) {
       setError('Login failed. Check credentials.');
@@ -35,6 +38,9 @@ const Login = () => {
         {error && <p className="error">{error}</p>}
         <button type="submit">Login</button>
       </form>
+      <div className="auth-footer">
+        <p>Don't have an account? <Link to="/register">Sign up</Link></p>
+      </div>
     </div>
   );
 };

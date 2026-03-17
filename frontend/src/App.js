@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import TaskList from './pages/TaskList';
 import TaskDetail from './pages/TaskDetail';
 import CreateTask from './pages/CreateTask';
+import Register from './pages/Register';
 import './styles.css';
 
 const App = () => {
@@ -18,6 +19,7 @@ const App = () => {
       <div className="app-container">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route
             path="/"
             element={
