@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/api';
 
@@ -8,18 +8,18 @@ const TaskDetail = () => {
   const [task, setTask] = useState(null);
   const [error, setError] = useState('');
 
-  const fetchTask = async () => {
+  const fetchTask = useCallback(async () => {
     try {
       const response = await api.get(`/api/tasks/${id}/`);
       setTask(response.data);
     } catch (err) {
       setError('Could not load task details.');
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchTask();
-  }, [id]);
+  }, [fetchTask]);
 
   const handleAction = async (action) => {
     setError('');
