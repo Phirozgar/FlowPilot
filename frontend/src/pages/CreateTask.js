@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
+import { toast } from '../components/Toast';
 
 const CreateTask = () => {
   const navigate = useNavigate();
@@ -49,25 +50,28 @@ const CreateTask = () => {
     setError('');
 
     try {
-      // 1. Create the task through standard task endpoint
+      // 1. Create the task
       const taskRes = await api.post('/api/tasks/', {
         title: formData.title,
         description: formData.description,
         assigned_to_id: formData.assigned_to_id || null
       });
 
-      // 2. If a workflow was selected, instantiate it manually
-      // In a real system, the backend might handle this hook automatically via signals.
+      // 2. If a workflow was selected, instantiate it
       if (formData.workflow_template_id) {
-         await api.post('/api/workflows/instances/', {
-            workflow_id: formData.workflow_template_id,
-            task_id: taskRes.data.id
-         });
+        await api.post('/api/workflows/instances/', {
+          workflow_id: formData.workflow_template_id,
+          task_id: taskRes.data.id
+        });
       }
 
+      toast.success('Task created successfully!');
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create task and link workflow.');
+      const msg = err.response?.data?.detail
+        || Object.values(err.response?.data || {})?.[0]?.[0]
+        || 'Failed to create task.';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -135,7 +139,7 @@ const CreateTask = () => {
              </div>
           </div>
 
-          {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.9rem' }}>{error}</p>}
+          {/* No inline error needed — using toast now */}
           
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
              <button type="submit" disabled={loading} className="btn btn-primary" style={{ flex: 1 }}>

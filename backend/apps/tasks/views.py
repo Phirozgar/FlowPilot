@@ -104,10 +104,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        """Only creator, manager or admin may modify a task."""
+        """Only creator, leader or superadmin may modify a task."""
         task = self.get_object()
         user = request.user
-        if user.is_regular_user() and task.created_by != user:
+        if not user.is_leader() and task.created_by != user:
             return Response(
                 {'detail': 'You may only edit tasks you created.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -120,7 +120,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         task = self.get_object()
         user = request.user
-        if user.is_regular_user() and task.created_by != user:
+        if not user.is_leader() and task.created_by != user:
             return Response(
                 {'detail': 'You may only delete tasks you created.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -212,9 +212,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         """Assign a task to a user (manager/admin only)."""
         task = self.get_object()
         user = request.user
-        if not (user.is_manager() or user.is_admin()):
+        if not user.is_leader():
             return Response(
-                {'detail': 'Only managers or admins can assign tasks.'},
+                {'detail': 'Only team leaders or higher can assign tasks.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -244,7 +244,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         """Manually change a task's status if authorized."""
         task = self.get_object()
         user = request.user
-        allowed = user.is_manager() or task.created_by == user or task.assigned_to == user
+        allowed = user.is_leader() or task.created_by == user or task.assigned_to == user
 
         if not allowed:
             return Response(

@@ -60,8 +60,8 @@ class UserViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
     
     def destroy(self, request, *args, **kwargs):
-        """Delete user. Only admins allowed."""
-        if not request.user.is_admin():
+        """Delete user. Only superadmins allowed."""
+        if not request.user.is_superadmin():
             return Response(
                 {'detail': 'You do not have permission to delete users.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -113,10 +113,10 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def by_role(self, request):
-        """Get users by role. Managers and admins only."""
-        if not request.user.is_manager():
+        """Get users by role."""
+        if not request.user.is_leader():
             return Response(
-                {'detail': 'You do not have permission to view users.'},
+                {'detail': 'You do not have permission to view users by role.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         

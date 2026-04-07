@@ -11,11 +11,18 @@ class MessageSerializer(serializers.ModelSerializer):
 
 class ChannelSerializer(serializers.ModelSerializer):
     recent_messages = serializers.SerializerMethodField()
+    member_names = serializers.SerializerMethodField()
 
     class Meta:
         model = Channel
-        fields = ['id', 'name', 'created_at', 'recent_messages']
+        fields = ['id', 'name', 'channel_type', 'created_at', 'recent_messages', 'member_names']
+        read_only_fields = ['id', 'created_at']
 
     def get_recent_messages(self, obj):
-        messages = obj.messages.all().order_by('-timestamp')[:5]
+        messages = obj.messages.all().order_by('-timestamp')[:1]
         return MessageSerializer(messages, many=True).data
+
+    def get_member_names(self, obj):
+        return [{'id': m.id, 'username': m.username, 'role': m.role,
+                 'first_name': m.first_name, 'last_name': m.last_name}
+                for m in obj.members.all()]
