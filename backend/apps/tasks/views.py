@@ -100,12 +100,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        """Only regular users are allowed to create tasks."""
-        if not request.user.is_regular_user():
-            return Response(
-                {'detail': 'Only regular users can create tasks.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        """Allow any authenticated user to create tasks."""
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):

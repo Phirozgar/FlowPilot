@@ -10,8 +10,26 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import CustomUser
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
+from .models import CustomUser, Team
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, TeamSerializer
+
+class TeamViewSet(viewsets.ModelViewSet):
+    queryset = Team.objects.all()
+    serializer_class = TeamSerializer
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def join(self, request):
+        code = request.data.get('code')
+        if not code:
+            return Response({'error': 'Team code is required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            team = Team.objects.get(code=code)
+            request.user.team = team
+            request.user.save()
+            return Response({'message': f'Successfully joined {team.name}', 'team': TeamSerializer(team).data})
+        except Team.DoesNotExist:
+            return Response({'error': 'Invalid team code'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -38,12 +56,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def list(self, request, *args, **kwargs):
-        """List all users. Only managers and admins allowed."""
-        if not request.user.is_manager():
-            return Response(
-                {'detail': 'You do not have permission to view all users.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        """List all users for system-wide collaboration."""
         return super().list(request, *args, **kwargs)
     
     def destroy(self, request, *args, **kwargs):

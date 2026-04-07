@@ -4,66 +4,147 @@ import api from '../api/api';
 
 const CreateTask = () => {
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [assignedToId, setAssignedToId] = useState('');
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    assigned_to_id: '',
+    workflow_template_id: ''
+  });
   const [users, setUsers] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get('/api/users/');
-        setUsers(res.data);
+        const [usersRes, tplRes, meRes] = await Promise.all([
+          api.get('/api/users/'),
+          api.get('/api/workflows/templates/'),
+          api.get('/api/users/me/')
+        ]);
+        
+        const me = meRes.data;
+        setCurrentUser(me);
+        
+        let fetchedUsers = usersRes.data.results || usersRes.data;
+        // Superadmin bypass; others can only assign to lower levels
+        if (!me.is_superuser && me.role_level !== 0) {
+           fetchedUsers = fetchedUsers.filter(u => u.role_level > me.role_level);
+        }
+        
+        setUsers(fetchedUsers);
+        setTemplates(tplRes.data.results || tplRes.data);
       } catch (err) {
-        setError('Unable to load users.');
+        console.error('Initial data load failed', err);
       }
     };
-    fetchUsers();
+    fetchData();
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setError('');
+
     try {
-      await api.post('/api/tasks/', {
-        title,
-        description,
-        assigned_to_id: assignedToId || null,
+      // 1. Create the task through standard task endpoint
+      const taskRes = await api.post('/api/tasks/', {
+        title: formData.title,
+        description: formData.description,
+        assigned_to_id: formData.assigned_to_id || null
       });
-      setMessage('Task created successfully');
-      setTimeout(() => navigate('/tasks'), 600);
+
+      // 2. If a workflow was selected, instantiate it manually
+      // In a real system, the backend might handle this hook automatically via signals.
+      if (formData.workflow_template_id) {
+         await api.post('/api/workflows/instances/', {
+            workflow_id: formData.workflow_template_id,
+            task_id: taskRes.data.id
+         });
+      }
+
+      navigate('/');
     } catch (err) {
-      setError('Could not create task.');
+      setError(err.response?.data?.detail || 'Failed to create task and link workflow.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="page">
-      <h2>Create Task</h2>
-      {error && <p className="error">{error}</p>}
-      {message && <p className="success">{message}</p>}
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <div>
-          <label>Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </div>
-        <div>
-          <label>Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-        </div>
-        <div>
-          <label>Assign To</label>
-          <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
-            <option value="">Unassigned</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.username}</option>
-            ))}
-          </select>
-        </div>
-        <button type="submit">Create Task</button>
-      </form>
+    <div className="animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <h1>Launch New Task Workflow</h1>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Every task created here initiates a contextual chat thread and optional workflow instance.</p>
+      
+      <div className="glass-panel">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div>
+            <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Task Title</label>
+            <input 
+              className="chat-input"
+              style={{ width: '100%', marginTop: '0.5rem' }}
+              value={formData.title} 
+              onChange={(e) => setFormData({...formData, title: e.target.value})} 
+              placeholder="e.g. Purchase New Dev Hardware"
+              required 
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Description (Optional)</label>
+            <textarea 
+              className="chat-input"
+              style={{ width: '100%', marginTop: '0.5rem', minHeight: '100px', resize: 'vertical' }}
+              value={formData.description} 
+              onChange={(e) => setFormData({...formData, description: e.target.value})} 
+              placeholder="Provide context for the team..."
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+             <div>
+                <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Initial Assignee</label>
+                <select 
+                   className="chat-input"
+                   style={{ width: '100%', marginTop: '0.5rem' }}
+                   value={formData.assigned_to_id}
+                   onChange={(e) => setFormData({...formData, assigned_to_id: e.target.value})}
+                >
+                   <option value="">Unassigned</option>
+                   {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.username}</option>
+                   ))}
+                </select>
+             </div>
+
+             <div>
+                <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Workflow Template</label>
+                <select 
+                   className="chat-input"
+                   style={{ width: '100%', marginTop: '0.5rem' }}
+                   value={formData.workflow_template_id}
+                   onChange={(e) => setFormData({...formData, workflow_template_id: e.target.value})}
+                >
+                   <option value="">None (Static Task)</option>
+                   {templates.map(tpl => (
+                      <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                   ))}
+                </select>
+             </div>
+          </div>
+
+          {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.9rem' }}>{error}</p>}
+          
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+             <button type="submit" disabled={loading} className="btn btn-primary" style={{ flex: 1 }}>
+                {loading ? 'Initializing Engine...' : 'Launch Workflow'}
+             </button>
+             <button type="button" onClick={() => navigate('/')} className="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

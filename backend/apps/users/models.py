@@ -1,6 +1,22 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import uuid
 
+class Team(models.Model):
+    name = models.CharField(max_length=255)
+    code = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
+    organization = models.CharField(max_length=255, default='FlowPilot Inc')
+
+    def __str__(self):
+        return self.name
+
+ROLE_LEVELS = {
+    'superadmin': 0,
+    'team_leader': 1,
+    'senior_dev': 2,
+    'junior_dev': 3,
+    'intern': 4,
+}
 
 class CustomUser(AbstractUser):
     """
@@ -13,17 +29,20 @@ class CustomUser(AbstractUser):
     """
     
     ROLE_CHOICES = [
-        ('admin', 'Admin'),
-        ('manager', 'Manager'),
-        ('user', 'User'),
+        ('superadmin', 'Superadmin'),
+        ('team_leader', 'Team Leader'),
+        ('senior_dev', 'Senior Developer'),
+        ('junior_dev', 'Junior Developer'),
+        ('intern', 'Intern'),
     ]
     
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
-        default='user',
+        default='intern',
         help_text='User role for permission management'
     )
+    team = models.ForeignKey(Team, null=True, blank=True, on_delete=models.SET_NULL, related_name='members')
     
     class Meta:
         db_table = 'users_customuser'
@@ -34,14 +53,14 @@ class CustomUser(AbstractUser):
         """String representation of user with role."""
         return f"{self.username} ({self.get_role_display()})"
     
-    def is_admin(self):
-        """Check if user is an admin."""
-        return self.role.lower() == 'admin'
+    def is_superadmin(self):
+        return self.role.lower() == 'superadmin' or self.is_superuser
     
-    def is_manager(self):
-        """Check if user is a manager or admin."""
-        return self.role.lower() in ['admin', 'manager']
-    
-    def is_regular_user(self):
-        """Check if user is a regular user."""
-        return self.role.lower() == 'user'
+    def is_leader(self):
+        return self.role.lower() in ['superadmin', 'team_leader'] or self.is_superuser
+
+    @property
+    def role_level(self):
+        if self.is_superuser:
+            return 0
+        return ROLE_LEVELS.get(self.role.lower(), 5)

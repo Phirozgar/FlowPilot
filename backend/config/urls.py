@@ -12,4 +12,7 @@ urlpatterns = [
     # App URLs
     path('api/users/', include('apps.users.urls')),
     path('api/tasks/', include('apps.tasks.urls')),
+    path('api/workflows/', include('apps.workflow.urls')),
+    path('api/chat/', include('apps.communication.urls')),
+    path('api/calendar/', include('apps.calendar.urls')),
 ]
