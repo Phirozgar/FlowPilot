@@ -19,8 +19,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('opsflow_token');
-      window.location.href = '/login';
+      const onAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+      if (!onAuthPage) {
+        localStorage.removeItem('opsflow_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

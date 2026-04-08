@@ -10,7 +10,7 @@ from apps.workflow.models import WorkflowTemplate, WorkflowStep, WorkflowInstanc
 from apps.tasks.models import Task
 from apps.communication.models import Channel, Message
 from apps.calendar.models import CalendarEvent
-from apps.users.models import Team
+from apps.users.models import Team, UserTeamMembership
 
 User = get_user_model()
 
@@ -49,6 +49,19 @@ junior_2 = User.objects.create_user(username='junior_dev_2', email='jr2@flowpilo
 intern_1 = User.objects.create_user(username='intern_1', email='in1@flowpilot.local', password='pass123', role='intern', team=eng_team)
 intern_2 = User.objects.create_user(username='intern_2', email='in2@flowpilot.local', password='pass123', role='intern', team=eng_team)
 intern_3 = User.objects.create_user(username='intern_3', email='in3@flowpilot.local', password='pass123', role='intern', team=eng_team)
+# Create membership records for team members
+print("Seeding Team Memberships...")
+for user, role in [
+    (team_leader, 'team_leader'),
+    (senior_1, 'senior_dev'),
+    (senior_2, 'senior_dev'),
+    (junior_1, 'junior_dev'),
+    (junior_2, 'junior_dev'),
+    (intern_1, 'intern'),
+    (intern_2, 'intern'),
+    (intern_3, 'intern'),
+]:
+    UserTeamMembership.objects.get_or_create(user=user, team=eng_team, defaults={'role': role})
 
 print("Seeding Workflow Templates...")
 dev_lifecycle = WorkflowTemplate.objects.create(

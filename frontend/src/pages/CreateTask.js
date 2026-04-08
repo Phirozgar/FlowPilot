@@ -8,6 +8,7 @@ const CreateTask = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    priority: 'medium',
     assigned_to_id: '',
     workflow_template_id: ''
   });
@@ -30,9 +31,11 @@ const CreateTask = () => {
         setCurrentUser(me);
         
         let fetchedUsers = usersRes.data.results || usersRes.data;
-        // Superadmin bypass; others can only assign to lower levels
+        // Superadmin sees everyone; others see same-level or lower (can't assign up)
         if (!me.is_superuser && me.role_level !== 0) {
-           fetchedUsers = fetchedUsers.filter(u => u.role_level > me.role_level);
+           fetchedUsers = fetchedUsers.filter(u => u.role_level >= me.role_level && u.id !== me.id);
+        } else {
+           fetchedUsers = fetchedUsers.filter(u => u.id !== me.id);
         }
         
         setUsers(fetchedUsers);
@@ -54,7 +57,10 @@ const CreateTask = () => {
       const taskRes = await api.post('/api/tasks/', {
         title: formData.title,
         description: formData.description,
-        assigned_to_id: formData.assigned_to_id || null
+        priority: formData.priority,
+        assigned_to_id: formData.assigned_to_id === 'self'
+          ? currentUser?.id
+          : (formData.assigned_to_id || null)
       });
 
       // 2. If a workflow was selected, instantiate it
@@ -116,7 +122,8 @@ const CreateTask = () => {
                    value={formData.assigned_to_id}
                    onChange={(e) => setFormData({...formData, assigned_to_id: e.target.value})}
                 >
-                   <option value="">Unassigned</option>
+                 <option value="">Unassigned (Independent)</option>
+                   <option value="self">⭐ Myself — Self-assigned</option>
                    {users.map(u => (
                       <option key={u.id} value={u.id}>{u.username}</option>
                    ))}

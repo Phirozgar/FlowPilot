@@ -1,109 +1,103 @@
-"""
-Serializers for task management API.
-
-Handles serialization and deserialization of task data with validation.
-"""
-
 from rest_framework import serializers
 from .models import Task
 from ..users.models import CustomUser
 from ..users.serializers import UserSerializer
 
+ROLE_LABEL = {0: 'Superadmin', 1: 'Team Leader', 2: 'Senior Dev', 3: 'Junior Dev', 4: 'Intern'}
 
-class TaskSerializer(serializers.ModelSerializer):
-    """
-    Serializer for detailed task data with full user information.
-    
-    Used for retrieve and detail views where full user info is needed.
-    """
-    
+
+class TicketSerializer(serializers.ModelSerializer):
+    """Full ticket detail serializer."""
     created_by = UserSerializer(read_only=True)
     assigned_to = UserSerializer(read_only=True)
     assigned_to_id = serializers.PrimaryKeyRelatedField(
-        queryset=CustomUser.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
-        source='assigned_to',
-        help_text='User ID to assign task to'
+        queryset=CustomUser.objects.all(), write_only=True,
+        required=False, allow_null=True, source='assigned_to'
     )
-    
+    current_approver_role = serializers.SerializerMethodField()
+    pipeline = serializers.SerializerMethodField()
+
     class Meta:
         model = Task
         fields = [
-            'id',
-            'title',
-            'description',
-            'created_by',
-            'assigned_to',
-            'assigned_to_id',
-            'status',
-            'approval_step',
-            'created_at',
-            'updated_at',
+            'id', 'ticket_number', 'title', 'description', 'priority',
+            'created_by', 'assigned_to', 'assigned_to_id',
+            'status', 'current_approver_level', 'current_approver_role',
+            'pipeline', 'approval_step', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'approval_step']
-    
+        read_only_fields = [
+            'id', 'ticket_number', 'created_by', 'current_approver_level',
+            'approval_step', 'created_at', 'updated_at',
+        ]
+
+    def get_current_approver_role(self, obj):
+        if obj.status in ('closed', 'rejected'):
+            return None
+        return ROLE_LABEL.get(obj.current_approver_level, 'Unknown')
+
+    def get_pipeline(self, obj):
+        """Returns pipeline stages showing which levels have been cleared."""
+        creator_level = obj.created_by.role_level if obj.created_by else 4
+        stages = []
+        for level in range(creator_level - 1, -1, -1):
+            if obj.status == 'closed':
+                done = True
+            elif obj.status == 'rejected':
+                done = level > obj.current_approver_level
+            else:
+                done = level > obj.current_approver_level
+            stages.append({
+                'level': level,
+                'role': ROLE_LABEL.get(level, 'Unknown'),
+                'done': done,
+                'current': obj.status not in ('closed', 'rejected') and level == obj.current_approver_level,
+            })
+        return stages
+
     def create(self, validated_data):
-        """Create task with current user as creator."""
-        validated_data['created_by'] = self.context['request'].user
+        user = self.context['request'].user
+        validated_data['created_by'] = user
+        # Set initial approver level: one step above creator
+        creator_level = user.role_level
+        if creator_level > 0:
+            validated_data['current_approver_level'] = creator_level - 1
+        else:
+            # Superadmin tickets are auto-closed
+            validated_data['status'] = 'closed'
+            validated_data['current_approver_level'] = -1
         return super().create(validated_data)
 
 
-class TaskListSerializer(serializers.ModelSerializer):
-    """
-    Lightweight serializer for listing tasks.
-    
-    Returns only essential fields to reduce payload size and improve performance.
-    """
-    
-    created_by_username = serializers.CharField(
-        source='created_by.username',
-        read_only=True,
-        help_text='Username of task creator'
-    )
-    assigned_to_username = serializers.CharField(
-        source='assigned_to.username',
-        read_only=True,
-        allow_null=True,
-        help_text='Username of assigned user'
-    )
-    
+class TicketListSerializer(serializers.ModelSerializer):
+    """Lightweight list serializer."""
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True, allow_null=True)
+    assigned_to = serializers.PrimaryKeyRelatedField(read_only=True)
+    current_approver_role = serializers.SerializerMethodField()
+
     class Meta:
         model = Task
         fields = [
-            'id',
-            'title',
-            'created_by_username',
-            'assigned_to_username',
-            'status',
-            'approval_step',
-            'created_at',
+            'id', 'ticket_number', 'title', 'description', 'priority',
+            'created_by_username', 'created_by_name',
+            'assigned_to', 'assigned_to_username',
+            'status', 'current_approver_level', 'current_approver_role',
+            'approval_step', 'created_at',
         ]
 
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return None
+        u = obj.created_by
+        return f"{u.first_name} {u.last_name}".strip() or u.username
 
-class DashboardSerializer(serializers.Serializer):
-    """
-    Serializer for dashboard statistics.
-    
-    Aggregates task statistics for dashboard display.
-    """
-    
-    total_tasks = serializers.IntegerField(
-        help_text="Total number of tasks visible to user"
-    )
-    tasks_created_by_user = serializers.IntegerField(
-        help_text="Tasks created by the user"
-    )
-    tasks_assigned_to_user = serializers.IntegerField(
-        help_text="Tasks assigned to the user"
-    )
-    pending_tasks = serializers.IntegerField(
-        help_text="Tasks with status 'in_review'"
-    )
-    approved_tasks = serializers.IntegerField(
-        help_text="Tasks with status 'approved'"
-    )
-    rejected_tasks = serializers.IntegerField(
-        help_text="Tasks with status 'rejected'"
-    )
+    def get_current_approver_role(self, obj):
+        if obj.status in ('closed', 'rejected'):
+            return None
+        return ROLE_LABEL.get(obj.current_approver_level, 'Unknown')
+
+
+# Back-compat aliases
+TaskSerializer = TicketSerializer
+TaskListSerializer = TicketListSerializer

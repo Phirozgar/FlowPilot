@@ -19,15 +19,6 @@ ROLE_LEVELS = {
 }
 
 class CustomUser(AbstractUser):
-    """
-    Extended User model with role-based access control.
-    
-    Roles:
-    - admin: Full access to all operations
-    - manager: Can review and approve tasks at step 1
-    - user: Can create tasks, view own tasks
-    """
-    
     ROLE_CHOICES = [
         ('superadmin', 'Superadmin'),
         ('team_leader', 'Team Leader'),
@@ -35,27 +26,27 @@ class CustomUser(AbstractUser):
         ('junior_dev', 'Junior Developer'),
         ('intern', 'Intern'),
     ]
-    
+
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
         default='intern',
         help_text='User role for permission management'
     )
+    # Primary (active) team
     team = models.ForeignKey(Team, null=True, blank=True, on_delete=models.SET_NULL, related_name='members')
-    
+
     class Meta:
         db_table = 'users_customuser'
         verbose_name = 'User'
         verbose_name_plural = 'Users'
-    
+
     def __str__(self):
-        """String representation of user with role."""
         return f"{self.username} ({self.get_role_display()})"
-    
+
     def is_superadmin(self):
         return self.role.lower() == 'superadmin' or self.is_superuser
-    
+
     def is_leader(self):
         return self.role.lower() in ['superadmin', 'team_leader'] or self.is_superuser
 
@@ -64,3 +55,25 @@ class CustomUser(AbstractUser):
         if self.is_superuser:
             return 0
         return ROLE_LEVELS.get(self.role.lower(), 5)
+
+
+class UserTeamMembership(models.Model):
+    """Tracks all teams a user belongs to and their role in each."""
+    ROLE_CHOICES = [
+        ('superadmin', 'Superadmin'),
+        ('team_leader', 'Team Leader'),
+        ('senior_dev', 'Senior Developer'),
+        ('junior_dev', 'Junior Developer'),
+        ('intern', 'Intern'),
+    ]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='team_memberships')
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='memberships')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='intern')
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'team')
+        ordering = ['-joined_at']
+
+    def __str__(self):
+        return f"{self.user.username} in {self.team.name} as {self.role}"
