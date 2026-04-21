@@ -188,14 +188,24 @@ const Channels = () => {
   }, []);
 
   const fetchTeamMembers = useCallback(async () => {
-    if (!currentUser?.team) return;
+    if (!currentUser?.team) {
+      setTeamMembers([]);
+      return;
+    }
     try {
       const res = await api.get('/api/users/');
       let users = res.data.results || res.data;
-      users = users.filter(u => u.team === currentUser.team && u.id !== currentUser.id);
+      // Issue 3: Match on team ID within the user's membership list
+      const activeTeamId = Number(currentUser.team);
+      users = users
+        .filter(u => u.all_teams?.some(m => Number(m.team_id) === activeTeamId) && u.id !== currentUser.id)
+        .map(u => {
+           const membership = u.all_teams.find(m => Number(m.team_id) === activeTeamId);
+           return { ...u, displayRole: membership?.role || u.role };
+        });
       setTeamMembers(users);
     } catch (err) {
-      console.error(err);
+      console.error('fetchTeamMembers error:', err);
     }
   }, [currentUser]);
 
@@ -215,12 +225,15 @@ const Channels = () => {
 
   useEffect(() => {
     const init = async () => {
+      setLoading(true);
+      setSelectedChannel(null); // clear selected channel on team switch (Issue 2)
       await Promise.all([fetchChannels(), fetchTeamMembers()]);
       await ensureGroupChat();
       setLoading(false);
     };
     if (currentUser) init();
-  }, [currentUser, fetchChannels, fetchTeamMembers, ensureGroupChat]);
+  // Re-run whenever the active team changes (Issue 2)
+  }, [currentUser, currentUser?.team, fetchChannels, fetchTeamMembers, ensureGroupChat]);
 
   const startDm = async (member) => {
     setStartingDm(true);
@@ -371,8 +384,8 @@ const Channels = () => {
                       {member.first_name || member.username}
                       {member.last_name ? ` ${member.last_name}` : ''}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: ROLE_COLORS[member.role] || 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                      {member.role?.replace('_', ' ')}
+                    <div style={{ fontSize: '0.72rem', color: ROLE_COLORS[member.displayRole] || 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      {member.displayRole?.replace('_', ' ')}
                     </div>
                   </div>
                   <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>Message →</div>

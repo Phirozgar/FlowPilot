@@ -48,7 +48,6 @@ junior_2 = User.objects.create_user(username='junior_dev_2', email='jr2@flowpilo
 
 intern_1 = User.objects.create_user(username='intern_1', email='in1@flowpilot.local', password='pass123', role='intern', team=eng_team)
 intern_2 = User.objects.create_user(username='intern_2', email='in2@flowpilot.local', password='pass123', role='intern', team=eng_team)
-intern_3 = User.objects.create_user(username='intern_3', email='in3@flowpilot.local', password='pass123', role='intern', team=eng_team)
 # Create membership records for team members
 print("Seeding Team Memberships...")
 for user, role in [

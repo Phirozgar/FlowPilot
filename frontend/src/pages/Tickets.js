@@ -8,6 +8,9 @@ const PRIORITY_COLOR = { low: '#64748b', medium: '#3b82f6', high: '#f59e0b', cri
 const STATUS_COLOR = { open: '#3b82f6', in_review: '#f59e0b', closed: '#10b981', rejected: '#ef4444' };
 const STATUS_LABEL = { open: 'Open', in_review: 'In Review', closed: 'Closed', rejected: 'Rejected' };
 
+// Issue 8: Column grid — added a narrow delete column
+const GRID_COLS = '120px 1fr 100px 100px 120px 110px 40px';
+
 const FILTERS = [
   { key: '', label: 'All' },
   { key: 'open', label: 'Open' },
@@ -23,6 +26,7 @@ const Tickets = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [mineOnly, setMineOnly] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -34,15 +38,36 @@ const Tickets = () => {
       const res = await api.get(url);
       setTickets(res.data.results || res.data);
     } catch (err) {
-      toast.error('Failed to load tickets.');
+      toast.error('Failed to load tickets. Please try again.');
     } finally {
       setLoading(false);
     }
   }, [statusFilter, mineOnly]);
 
+  // Reload when user or their active team changes (Issue 2)
   useEffect(() => {
-    if (currentUser) fetchTickets();
-  }, [currentUser, fetchTickets]);
+    if (currentUser) {
+      setLoading(true);
+      fetchTickets();
+    }
+  }, [currentUser, currentUser?.team, fetchTickets]);
+
+  // Issue 8: delete a ticket with confirmation
+  const handleDelete = async (e, ticketId, ticketNumber) => {
+    e.stopPropagation(); // don't navigate to detail page
+    if (!window.confirm(`Delete ticket ${ticketNumber}? This cannot be undone.`)) return;
+    setDeletingId(ticketId);
+    try {
+      await api.delete(`/api/tasks/${ticketId}/`);
+      toast.success(`Ticket ${ticketNumber} deleted.`);
+      setTickets(prev => prev.filter(t => t.id !== ticketId));
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to delete ticket.';
+      toast.error(msg);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const safeQ = (searchQuery || '').toLowerCase();
   const filtered = tickets.filter(t =>
@@ -102,7 +127,7 @@ const Tickets = () => {
           {/* Table header */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '120px 1fr 100px 100px 120px 110px',
+            gridTemplateColumns: GRID_COLS,
             padding: '0.7rem 1.25rem',
             borderBottom: '1px solid var(--border-color)',
             fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)',
@@ -112,8 +137,9 @@ const Tickets = () => {
             <span>Title</span>
             <span>Status</span>
             <span>Priority</span>
-            <span>Reporter</span>
+            <span>Raised By</span>
             <span>Next Approver</span>
+            <span></span>
           </div>
 
           <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
@@ -128,7 +154,7 @@ const Tickets = () => {
                 onClick={() => navigate(`/tickets/${t.id}`)}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '120px 1fr 100px 100px 120px 110px',
+                  gridTemplateColumns: GRID_COLS,
                   padding: '0.85rem 1.25rem',
                   borderBottom: i < filtered.length - 1 ? '1px solid var(--border-color)' : 'none',
                   cursor: 'pointer', alignItems: 'center',
@@ -157,6 +183,25 @@ const Tickets = () => {
                 </span>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.created_by_name || t.created_by_username}</span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.current_approver_role || '—'}</span>
+                {/* Issue 8: Delete button — only shown when backend says can_delete */}
+                <span onClick={e => e.stopPropagation()}>
+                  {t.can_delete && (
+                    <button
+                      title="Delete this ticket"
+                      disabled={deletingId === t.id}
+                      onClick={e => handleDelete(e, t.id, t.ticket_number)}
+                      style={{
+                        padding: '0.15rem 0.4rem', borderRadius: '4px',
+                        border: '1px solid rgba(239,68,68,0.35)',
+                        background: 'rgba(239,68,68,0.08)', color: '#ef4444',
+                        cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.7rem',
+                        opacity: deletingId === t.id ? 0.5 : 1,
+                      }}
+                    >
+                      {deletingId === t.id ? '…' : '×'}
+                    </button>
+                  )}
+                </span>
               </div>
             ))}
           </div>

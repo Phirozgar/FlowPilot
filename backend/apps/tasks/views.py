@@ -1,3 +1,13 @@
+"""
+Ticket (Task) viewset — hierarchical approval pipeline.
+
+Issue 8: `destroy()` now enforces can_delete() rule:
+  creator can only delete if no approvals have happened yet.
+Issue 6: Handled via TicketSerializer — 'direct' workflow flag sets
+  current_approver_level = team_leader level (1) regardless of creator.
+"""
+
+import logging
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +19,7 @@ from .models import Task
 from .serializers import TicketSerializer, TicketListSerializer
 from .services import TicketPipelineService, TaskQueryService
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -58,16 +69,28 @@ class TaskViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         task = self.get_object()
         if not request.user.is_leader() and task.created_by != request.user:
-            return Response({'detail': 'You may only edit tickets you created.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {'detail': 'You may only edit tickets you created.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
+        """
+        Issue 8: Enforce can_delete — creator can only delete if
+        no approvals have happened yet (still open at initial approver level).
+        """
         task = self.get_object()
-        if not request.user.is_leader() and task.created_by != request.user:
-            return Response({'detail': 'You may only delete tickets you created.'}, status=status.HTTP_403_FORBIDDEN)
+        can, reason = TicketPipelineService.can_delete(task, request.user)
+        if not can:
+            return Response({'detail': reason}, status=status.HTTP_403_FORBIDDEN)
+
+        logger.info(
+            'Ticket %s deleted by %s', task.ticket_number, request.user.username
+        )
         return super().destroy(request, *args, **kwargs)
 
     # ── Pipeline Actions ──────────────────────────────────────────────────────
@@ -124,16 +147,17 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def awaiting_my_review(self, request):
-        """Tickets waiting for the current user's approval level."""
+        """Tickets that are at the current user's approval level."""
         user = request.user
         tickets = TaskQueryService.get_user_visible_tasks(user).filter(
             status__in=['open', 'in_review'],
-            current_approver_level=user.role_level
+            current_approver_level=user.role_level,
         ).exclude(created_by=user)
         return Response(TicketListSerializer(tickets, many=True).data)
 
     @action(detail=False, methods=['get'])
     def my_tasks(self, request):
+        """Tickets created by or assigned to the current user."""
         tickets = self.get_queryset().filter(
             Q(created_by=request.user) | Q(assigned_to=request.user)
         )
@@ -141,5 +165,6 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
+        """Aggregate dashboard statistics."""
         stats = TaskQueryService.get_dashboard_stats(request.user)
         return Response(stats)
